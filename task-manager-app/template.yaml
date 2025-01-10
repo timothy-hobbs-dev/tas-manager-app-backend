@@ -62,9 +62,9 @@ Resources:
   AssignTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: ./functions/assign_task.lambda_handler
+      Handler: assign_task.lambda_handler
       Runtime: python3.11
-      CodeUri: .
+      CodeUri: functions/tasks/
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TasksTable
@@ -79,9 +79,9 @@ Resources:
   GetUserTasksFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: ./functions/get_user_tasks.lambda_handler
+      Handler: get_user_tasks.lambda_handler
       Runtime: python3.11
-      CodeUri: .
+      CodeUri: functions/tasks/
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref TasksTable
@@ -96,9 +96,9 @@ Resources:
   EditTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: ./functions/edit_task.lambda_handler
+      Handler: edit_task.lambda_handler
       Runtime: python3.11
-      CodeUri: .
+      CodeUri: functions/tasks/
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TasksTable
@@ -113,9 +113,9 @@ Resources:
   DeleteTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: ./functions/delete_task.lambda_handler
+      Handler: delete_task.lambda_handler
       Runtime: python3.11
-      CodeUri: .
+      CodeUri: functions/tasks/
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TasksTable
@@ -130,9 +130,9 @@ Resources:
   GetAllTasksFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: ./functions/get_all_tasks.lambda_handler
+      Handler: get_all_tasks.lambda_handler
       Runtime: python3.11
-      CodeUri: .
+      CodeUri: functions/tasks/
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref TasksTable
@@ -141,5 +141,22 @@ Resources:
           Type: Api
           Properties:
             Path: /tasks/all
+            Method: get
+            RestApiId: !Ref ApiGateway
+
+  TestApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: testapi.lambda_handler
+      Runtime: python3.11
+      CodeUri: functions/tasks/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TasksTable
+      Events:
+        GetAllTasks:
+          Type: Api
+          Properties:
+            Path: /tasks/test
             Method: get
             RestApiId: !Ref ApiGateway
