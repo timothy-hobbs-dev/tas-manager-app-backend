@@ -62,8 +62,8 @@ Resources:
   AssignTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: functions.assign_task.lambda_handler
-      Runtime: python3.9
+      Handler: ./functions/assign_task.lambda_handler
+      Runtime: python3.11
       CodeUri: .
       Policies:
         - DynamoDBCrudPolicy:
@@ -79,8 +79,8 @@ Resources:
   GetUserTasksFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: functions.get_user_tasks.lambda_handler
-      Runtime: python3.9
+      Handler: ./functions/get_user_tasks.lambda_handler
+      Runtime: python3.11
       CodeUri: .
       Policies:
         - DynamoDBReadPolicy:
@@ -96,8 +96,8 @@ Resources:
   EditTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: functions.edit_task.lambda_handler
-      Runtime: python3.9
+      Handler: ./functions/edit_task.lambda_handler
+      Runtime: python3.11
       CodeUri: .
       Policies:
         - DynamoDBCrudPolicy:
@@ -113,8 +113,8 @@ Resources:
   DeleteTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: functions.delete_task.lambda_handler
-      Runtime: python3.9
+      Handler: ./functions/delete_task.lambda_handler
+      Runtime: python3.11
       CodeUri: .
       Policies:
         - DynamoDBCrudPolicy:
@@ -130,8 +130,8 @@ Resources:
   GetAllTasksFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: functions.get_all_tasks.lambda_handler
-      Runtime: python3.9
+      Handler: ./functions/get_all_tasks.lambda_handler
+      Runtime: python3.11
       CodeUri: .
       Policies:
         - DynamoDBReadPolicy:
