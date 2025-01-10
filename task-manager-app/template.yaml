@@ -36,22 +36,110 @@ Resources:
         - ALLOW_REFRESH_TOKEN_AUTH
         - ALLOW_ADMIN_USER_PASSWORD_AUTH
 
-  LoginFunction:
+  TasksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TasksTable
+      AttributeDefinitions:
+        - AttributeName: TaskId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: TaskId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: MyApi
+      StageName: prod
+      Auth:
+        DefaultAuthorizer: CognitoAuth
+        Authorizers:
+          CognitoAuth:
+            UserPoolArn: !GetAtt CognitoUserPool.Arn
+
+  AssignTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: LoginFunction
-      Runtime: python3.11
-      Handler: app.lambda_handler
-      CodeUri: ./functions/login/
+      Handler: functions.assign_task.lambda_handler
+      Runtime: python3.9
+      CodeUri: .
       Policies:
-        - AmazonCognitoPowerUser
-      Environment:
-        Variables:
-          USER_POOL_ID: !Ref CognitoUserPool
-          CLIENT_ID: !Ref CognitoUserPoolClient
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
       Events:
-        LoginAPI:
+        AssignTask:
           Type: Api
           Properties:
-            Path: /login
+            Path: /tasks
             Method: post
+            RestApiId: !Ref ApiGateway
+
+  GetUserTasksFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions.get_user_tasks.lambda_handler
+      Runtime: python3.9
+      CodeUri: .
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TasksTable
+      Events:
+        GetUserTasks:
+          Type: Api
+          Properties:
+            Path: /tasks
+            Method: get
+            RestApiId: !Ref ApiGateway
+
+  EditTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions.edit_task.lambda_handler
+      Runtime: python3.9
+      CodeUri: .
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+      Events:
+        EditTask:
+          Type: Api
+          Properties:
+            Path: /tasks
+            Method: put
+            RestApiId: !Ref ApiGateway
+
+  DeleteTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions.delete_task.lambda_handler
+      Runtime: python3.9
+      CodeUri: .
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+      Events:
+        DeleteTask:
+          Type: Api
+          Properties:
+            Path: /tasks
+            Method: delete
+            RestApiId: !Ref ApiGateway
+
+  GetAllTasksFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions.get_all_tasks.lambda_handler
+      Runtime: python3.9
+      CodeUri: .
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TasksTable
+      Events:
+        GetAllTasks:
+          Type: Api
+          Properties:
+            Path: /tasks/all
+            Method: get
+            RestApiId: !Ref ApiGateway
