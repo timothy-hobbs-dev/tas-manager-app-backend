@@ -89,6 +89,14 @@ Resources:
               - !Ref ClosedTasksNotificationTopic
               - !Ref ReopenedTasksNotificationTopic
               
+      Events:
+        AddUser:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: post
+            RestApiId: !Ref ApiGateway
+            
   AssignTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
