@@ -22,7 +22,7 @@ def lambda_handler(event, context):
                 {'Name': 'email_verified', 'Value': 'true'}
             ],
             TemporaryPassword=temporary_password,
-            MessageAction='SUPPRESS'  # Prevents Cognito from sending an email
+            # MessageAction='SUPPRESS'  # Prevents Cognito from sending an email
         )
 
         # Add user to the appropriate group
