@@ -1,3 +1,4 @@
+import datetime
 import json
 import boto3
 import logging
@@ -43,8 +44,12 @@ def lambda_handler(event, context):
             logger.warning(f"Unauthorized update attempt by {user_email} on task {task_id}")
             return {'statusCode': 403, 'body': json.dumps({'error': 'Unauthorized'})}
         
-        allowed_fields = ['status', 'user_comment'] if not is_admin else task_update.keys()
+        allowed_fields = ['status', 'comment'] if not is_admin else task_update.keys()
         task.update({k: v for k, v in task_update.items() if k in allowed_fields})
+
+        if task_update['status'] == 'completed':
+            task['completed_at'] =str(datetime.now())
+
         
         table.put_item(Item=task)
         logger.info(f"Task updated successfully: {task_id}")

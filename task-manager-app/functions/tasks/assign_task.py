@@ -11,25 +11,34 @@ logger.setLevel(logging.INFO)
 # Initialize DynamoDB and SNS
 try:
     dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table('TasksTable')
+    table_name = os.environ.get('TABLE_NAME', 'TasksTable')
+    table = dynamodb.Table(table_name)
     sns_client = boto3.client('sns')
 except Exception as e:
     logger.error(f"Error initializing AWS services: {e}")
     raise
 
 # Get SNS topic ARN from environment variable
-TASKS_ASSIGNMENT_TOPIC_ARN = os.getenv('TASKS_ASSIGNMENT_TOPIC_ARN')
+TASKS_ASSIGNMENT_TOPIC_ARN = os.environ.get('TASKS_ASSIGNMENT_TOPIC_ARN')
+if not TASKS_ASSIGNMENT_TOPIC_ARN:
+    logger.error("TASKS_ASSIGNMENT_TOPIC_ARN environment variable is not set")
 
-def send_task_notification(task, assignee_email):
+def send_task_notification(task, admin_email):
+    if not TASKS_ASSIGNMENT_TOPIC_ARN:
+        logger.error("Cannot send notification: SNS Topic ARN is not configured")
+        return
+
     try:
+        assignee_email =task["responsibility"]
         # Create a formatted message
         message = {
             'taskId': task['TaskId'],
-            'title': task.get('title', 'No title'),
+            'title': task.get('name', 'No title'),
             'description': task.get('description', 'No description'),
-            'dueDate': task.get('dueDate', 'No due date'),
-            'priority': task.get('priority', 'No priority'),
-            'assignee': assignee_email
+            'comment': task.get('comment', 'No description'),
+            'deadline': task.get('deadline', 'No deadline'),
+            'assigned_by': admin_email,
+            'responsibility': assignee_email
         }
 
         # Convert message to string and format it for email
@@ -39,13 +48,14 @@ New Task Assigned
 Task Details:
 - Title: {message['title']}
 - Description: {message['description']}
-- Due Date: {message['dueDate']}
-- Priority: {message['priority']}
+- Due Date: {message['deadline']}
 - Task ID: {message['taskId']}
+- Assigned by {message['assigned_by']}
 
 Please log in to the system to view more details and start working on your task.
 """
-
+        logger.info(f"Attempting to send notification to topic: {TASKS_ASSIGNMENT_TOPIC_ARN}")
+        
         # Publish to SNS topic
         response = sns_client.publish(
             TopicArn=TASKS_ASSIGNMENT_TOPIC_ARN,
@@ -61,8 +71,12 @@ Please log in to the system to view more details and start working on your task.
         logger.info(f"Notification sent successfully: {response['MessageId']}")
     except Exception as e:
         logger.error(f"Error sending notification: {e}")
+        logger.error(f"Topic ARN: {TASKS_ASSIGNMENT_TOPIC_ARN}")
+        logger.error(f"Task: {json.dumps(task)}")
         # Don't raise the exception - we don't want to fail the task creation if notification fails
         pass
+
+# Rest of the lambda_handler remains the same...
 
 def lambda_handler(event, context):
     try:
@@ -101,7 +115,7 @@ def lambda_handler(event, context):
         table.put_item(Item=task)
         
         # Send notification to assignee
-        send_task_notification(task, task['responsibility'])
+        send_task_notification(task, user_email)
         
         logger.info(f"Task assigned successfully: {task['TaskId']}")
         
