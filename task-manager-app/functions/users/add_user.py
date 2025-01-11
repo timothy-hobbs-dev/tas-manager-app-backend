@@ -19,11 +19,18 @@ def lambda_handler(event, context):
             Username=username,
             UserAttributes=[
                 {'Name': 'email', 'Value': email},
-                {'Name': 'email_verified', 'Value': 'true'},
-                {'Name': 'custom:role', 'Value': role}
+                {'Name': 'email_verified', 'Value': 'true'}
             ],
             TemporaryPassword=temporary_password,
             MessageAction='SUPPRESS'  # Prevents Cognito from sending an email
+        )
+
+        # Add user to the appropriate group
+        group_name = 'admin' if role == 'admin' else 'regular'
+        cognito_client.admin_add_user_to_group(
+            UserPoolId=USER_POOL_ID,
+            Username=username,
+            GroupName=group_name
         )
 
         return {
