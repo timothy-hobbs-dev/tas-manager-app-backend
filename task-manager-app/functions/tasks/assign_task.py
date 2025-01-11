@@ -4,6 +4,8 @@ import uuid
 import logging
 import os
 from datetime import datetime, timedelta
+import pytz  # Add this import for timezone handling
+
 
 # Configure logging
 logger = logging.getLogger()
@@ -26,23 +28,39 @@ TASKS_DEADLINE_TOPIC_ARN = os.environ.get('TASKS_DEADLINE_TOPIC_ARN')
 
 def schedule_deadline_notification(task, context):
     try:
-        if 'deadline' not in task:
-            logger.info("No deadline set for task, skipping deadline notification")
-            return
-
-        due_date = datetime.fromisoformat(task['deadline'].replace('Z', '+00:00'))
-        notification_time = due_date - timedelta(hours=1)
-        
-        # Skip if due date is less than an hour away or already passed
-        if notification_time <= datetime.utcnow():
-            logger.warning(f"Task {task['TaskId']} deadline too soon or already passed")
-            return
+        if 'deadline' in task:
+            try:
+                # Parse the deadline and make it timezone-aware if it isn't already
+                due_date = datetime.fromisoformat(task['deadline'].replace('Z', '+00:00'))
+                if due_date.tzinfo is None:
+                    due_date = pytz.UTC.localize(due_date)
+                
+                # Get current time in UTC
+                current_time = datetime.now(pytz.UTC)
+                
+                if due_date <= current_time:
+                    return {
+                        'statusCode': 400,
+                        'body': json.dumps({'error': 'Deadline must be in the future'})
+                    }
+            except ValueError:
+                return {
+                    'statusCode': 400,
+                    'body': json.dumps({'error': 'Invalid deadline format. Use ISO format (e.g., 2025-01-11T18:00:00Z)'})
+                }
 
         # Create a CloudWatch Events rule
         rule_name = f"task-deadline-{task['TaskId']}"
+        
+        # Format the cron expression using UTC time
+        cron_expression = (
+            f"cron({notification_time.minute} {notification_time.hour} "
+            f"{notification_time.day} {notification_time.month} ? {notification_time.year})"
+        )
+        
         events_client.put_rule(
             Name=rule_name,
-            ScheduleExpression=f"cron({notification_time.minute} {notification_time.hour} {notification_time.day} {notification_time.month} ? {notification_time.year})",
+            ScheduleExpression=cron_expression,
             State='ENABLED'
         )
 
@@ -62,11 +80,10 @@ def schedule_deadline_notification(task, context):
             }]
         )
 
-        logger.info(f"Scheduled deadline notification for task {task['TaskId']}")
+        logger.info(f"Scheduled deadline notification for task {task['TaskId']} at {notification_time} UTC")
 
     except Exception as e:
         logger.error(f"Error scheduling deadline notification: {e}")
-
 def send_task_notification(task, admin_email):
     if not TASKS_ASSIGNMENT_TOPIC_ARN:
         logger.error("Cannot send notification: SNS Topic ARN is not configured")
