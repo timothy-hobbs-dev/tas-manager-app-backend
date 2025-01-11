@@ -69,23 +69,26 @@ Resources:
       Environment:
         Variables:
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          TASKS_ASSIGNMENT_TOPIC_ARN: !Ref TasksAssignmentNotificationTopic
+          TASKS_DEADLINE_TOPIC_ARN: !Ref TasksDeadlineNotificationTopic
+          CLOSED_TASKS_TOPIC_ARN: !Ref ClosedTasksNotificationTopic
+          REOPENED_TASKS_TOPIC_ARN: !Ref ReopenedTasksNotificationTopic
       Policies:
         - AWSLambdaBasicExecutionRole
         - Statement:
             Effect: Allow
             Action: 
               - cognito-idp:AdminCreateUser
-              - cognito-idp:AdminAddUserToGroup  # ✅ Added this permission
-            Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPool}"
-      Events:
-        AddUser:
-          Type: Api
-          Properties:
-            Path: /users
-            Method: post
-            RestApiId: !Ref ApiGateway
-
-            
+              - cognito-idp:AdminAddUserToGroup
+              - sns:Subscribe
+              - sns:Publish
+            Resource: 
+              - !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPool}"
+              - !Ref TasksAssignmentNotificationTopic
+              - !Ref TasksDeadlineNotificationTopic
+              - !Ref ClosedTasksNotificationTopic
+              - !Ref ReopenedTasksNotificationTopic
+              
   AssignTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -187,3 +190,24 @@ Resources:
             Path: /tasks/test
             Method: get
             RestApiId: !Ref ApiGateway
+
+
+  TasksAssignmentNotificationTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: TasksAssignmentNotificationTopic
+
+  TasksDeadlineNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: TasksDeadlineNotificationTopic
+
+  ClosedTasksNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: ClosedTasksNotificationTopic
+
+  ReopenedTasksNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: ReopenedTasksNotificationTopic
