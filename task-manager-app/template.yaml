@@ -106,7 +106,8 @@ Resources:
       Environment:
         Variables:
           TASKS_ASSIGNMENT_TOPIC_ARN: !Ref TasksAssignmentNotificationTopic
-          TABLE_NAME: !Ref TasksTable  # Added this for better practice
+          TASKS_DEADLINE_TOPIC_ARN: !Ref TasksDeadlineNotificationTopic
+          TABLE_NAME: !Ref TasksTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TasksTable
@@ -114,7 +115,12 @@ Resources:
             Effect: Allow
             Action:
               - sns:Publish
-            Resource: !Ref TasksAssignmentNotificationTopic
+              - events:PutRule
+              - events:PutTargets
+            Resource: 
+              - !Ref TasksAssignmentNotificationTopic
+              - !Ref TasksDeadlineNotificationTopic
+              - "*"  # For EventBridge permissions
       Events:
         AssignTask:
           Type: Api
@@ -123,6 +129,27 @@ Resources:
             Method: post
             RestApiId: !Ref ApiGateway
 
+  TaskDeadlineNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: deadline_notification.lambda_handler
+      Runtime: python3.11
+      CodeUri: functions/tasks/
+      Environment:
+        Variables:
+          TASKS_DEADLINE_TOPIC_ARN: !Ref TasksDeadlineNotificationTopic
+          TABLE_NAME: !Ref TasksTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TasksTable
+        - Statement:
+            Effect: Allow
+            Action:
+              - sns:Publish
+              - events:DeleteRule
+              - events:RemoveTargets
+            Resource: "*"
+            
   GetUserTasksFunction:
     Type: AWS::Serverless::Function
     Properties:

@@ -3,25 +3,69 @@ import boto3
 import uuid
 import logging
 import os
+from datetime import datetime, timedelta
 
 # Configure logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Initialize DynamoDB and SNS
+# Initialize AWS services
 try:
     dynamodb = boto3.resource('dynamodb')
     table_name = os.environ.get('TABLE_NAME', 'TasksTable')
     table = dynamodb.Table(table_name)
     sns_client = boto3.client('sns')
+    events_client = boto3.client('events')
 except Exception as e:
     logger.error(f"Error initializing AWS services: {e}")
     raise
 
-# Get SNS topic ARN from environment variable
+# Get SNS topic ARNs from environment variables
 TASKS_ASSIGNMENT_TOPIC_ARN = os.environ.get('TASKS_ASSIGNMENT_TOPIC_ARN')
-if not TASKS_ASSIGNMENT_TOPIC_ARN:
-    logger.error("TASKS_ASSIGNMENT_TOPIC_ARN environment variable is not set")
+TASKS_DEADLINE_TOPIC_ARN = os.environ.get('TASKS_DEADLINE_TOPIC_ARN')
+
+def schedule_deadline_notification(task, context):
+    try:
+        if 'deadline' not in task:
+            logger.info("No deadline set for task, skipping deadline notification")
+            return
+
+        due_date = datetime.fromisoformat(task['deadline'].replace('Z', '+00:00'))
+        notification_time = due_date - timedelta(hours=1)
+        
+        # Skip if due date is less than an hour away or already passed
+        if notification_time <= datetime.utcnow():
+            logger.warning(f"Task {task['TaskId']} deadline too soon or already passed")
+            return
+
+        # Create a CloudWatch Events rule
+        rule_name = f"task-deadline-{task['TaskId']}"
+        events_client.put_rule(
+            Name=rule_name,
+            ScheduleExpression=f"cron({notification_time.minute} {notification_time.hour} {notification_time.day} {notification_time.month} ? {notification_time.year})",
+            State='ENABLED'
+        )
+
+        # Add target to the rule
+        events_client.put_targets(
+            Rule=rule_name,
+            Targets=[{
+                'Id': f"task-deadline-notification-{task['TaskId']}",
+                'Arn': context.invoked_function_arn.replace(
+                    context.function_name,
+                    'TaskDeadlineNotificationFunction'
+                ),
+                'Input': json.dumps({
+                    'taskId': task['TaskId'],
+                    'assignee_email': task['responsibility']
+                })
+            }]
+        )
+
+        logger.info(f"Scheduled deadline notification for task {task['TaskId']}")
+
+    except Exception as e:
+        logger.error(f"Error scheduling deadline notification: {e}")
 
 def send_task_notification(task, admin_email):
     if not TASKS_ASSIGNMENT_TOPIC_ARN:
@@ -29,7 +73,7 @@ def send_task_notification(task, admin_email):
         return
 
     try:
-        assignee_email =task["responsibility"]
+        assignee_email = task["responsibility"]
         # Create a formatted message
         message = {
             'taskId': task['TaskId'],
@@ -73,10 +117,7 @@ Please log in to the system to view more details and start working on your task.
         logger.error(f"Error sending notification: {e}")
         logger.error(f"Topic ARN: {TASKS_ASSIGNMENT_TOPIC_ARN}")
         logger.error(f"Task: {json.dumps(task)}")
-        # Don't raise the exception - we don't want to fail the task creation if notification fails
         pass
-
-# Rest of the lambda_handler remains the same...
 
 def lambda_handler(event, context):
     try:
@@ -107,6 +148,21 @@ def lambda_handler(event, context):
                 'body': json.dumps({'error': f'Missing required fields: {", ".join(missing_fields)}'})
             }
 
+        # Validate deadline format if provided
+        if 'deadline' in task:
+            try:
+                due_date = datetime.fromisoformat(task['deadline'].replace('Z', '+00:00'))
+                if due_date <= datetime.utcnow():
+                    return {
+                        'statusCode': 400,
+                        'body': json.dumps({'error': 'Deadline must be in the future'})
+                    }
+            except ValueError:
+                return {
+                    'statusCode': 400,
+                    'body': json.dumps({'error': 'Invalid deadline format. Use ISO format (e.g., 2025-01-11T18:00:00Z)'})
+                }
+
         # Generate TaskId and set status
         task['TaskId'] = str(uuid.uuid4())
         task['status'] = 'open'
@@ -116,6 +172,10 @@ def lambda_handler(event, context):
         
         # Send notification to assignee
         send_task_notification(task, user_email)
+        
+        # Schedule deadline notification if deadline is set
+        if 'deadline' in task:
+            schedule_deadline_notification(task, context)
         
         logger.info(f"Task assigned successfully: {task['TaskId']}")
         
