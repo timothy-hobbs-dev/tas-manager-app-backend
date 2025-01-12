@@ -28,63 +28,94 @@ TASKS_DEADLINE_TOPIC_ARN = os.environ.get('TASKS_DEADLINE_TOPIC_ARN')
 
 def schedule_deadline_notification(task, context):
     try:
-        if 'deadline' in task:
+        if 'deadline' not in task:
+            logger.info("No deadline set for task, skipping notification scheduling")
+            return
+
+        try:
+            # Parse the deadline and make it timezone-aware if it isn't already
+            due_date = datetime.fromisoformat(task['deadline'].replace('Z', '+00:00'))
+            if due_date.tzinfo is None:
+                due_date = pytz.UTC.localize(due_date)
+            
+            # Get current time in UTC
+            current_time = datetime.now(pytz.UTC)
+            
+            if due_date <= current_time:
+                logger.error("Deadline must be in the future")
+                return
+            
+            # Calculate notification time (1 hour before deadline)
+            notification_time = due_date - timedelta(hours=1)
+            
+            # Create a CloudWatch Events rule
+            rule_name = f"task-deadline-{task['TaskId']}"
+            
+            # Format the cron expression using UTC time
+            cron_expression = (
+                f"cron({notification_time.minute} {notification_time.hour} "
+                f"{notification_time.day} {notification_time.month} ? {notification_time.year})"
+            )
+            
+            logger.info(f"Creating EventBridge rule with expression: {cron_expression}")
+            
+            # Create the rule
+            events_client.put_rule(
+                Name=rule_name,
+                ScheduleExpression=cron_expression,
+                State='ENABLED'
+            )
+
+            deadline_function_name = os.environ.get('TASKS_DEADLINE_FUNCTION_NAME')
+            if not deadline_function_name:
+                logger.error("TASKS_DEADLINE_FUNCTION_NAME environment variable not set")
+                raise ValueError("Missing required environment variable: TASKS_DEADLINE_FUNCTION_NAME")
+
+            # Create the Lambda target
+            target_lambda_arn = os.environ.get('TASKS_DEADLINE_FUNCTION_ARN')
+            if not target_lambda_arn:
+                logger.error("TASKS_DEADLINE_FUNCTION_ARN environment variable not set")
+                raise ValueError("Missing required environment variable: TASKS_DEADLINE_FUNCTION_ARN")
+            
+            logger.info(f"Setting target Lambda ARN: {target_lambda_arn}")
+
+            # Add target to the rule
+            events_client.put_targets(
+                Rule=rule_name,
+                Targets=[{
+                    'Id': f"task-deadline-notification-{task['TaskId']}",
+                    'Arn': target_lambda_arn,
+                    'Input': json.dumps({
+                        'taskId': task['TaskId'],
+                        'assignee_email': task['responsibility']
+                    })
+                }]
+            )
+
+            # Add permission for EventBridge to invoke the Lambda
+            lambda_client = boto3.client('lambda')
             try:
-                # Parse the deadline and make it timezone-aware if it isn't already
-                due_date = datetime.fromisoformat(task['deadline'].replace('Z', '+00:00'))
-                if due_date.tzinfo is None:
-                    due_date = pytz.UTC.localize(due_date)
-                
-                # Get current time in UTC
-                current_time = datetime.now(pytz.UTC)
-                
-                if due_date <= current_time:
-                    return {
-                        'statusCode': 400,
-                        'body': json.dumps({'error': 'Deadline must be in the future'})
-                    }
-            except ValueError:
-                return {
-                    'statusCode': 400,
-                    'body': json.dumps({'error': 'Invalid deadline format. Use ISO format (e.g., 2025-01-11T18:00:00Z)'})
-                }
+                lambda_client.add_permission(
+                    FunctionName=deadline_function_name,
+                    StatementId=f"EventBridge-{task['TaskId']}",
+                    Action='lambda:InvokeFunction',
+                    Principal='events.amazonaws.com',
+                    SourceArn=f"arn:aws:events:{os.environ['AWS_REGION']}:{os.environ['AWS_ACCOUNT_ID']}:rule/{rule_name}"
+                )
+            except lambda_client.exceptions.ResourceConflictException:
+                # Permission already exists, which is fine
+                pass
 
-        # Create a CloudWatch Events rule
-        rule_name = f"task-deadline-{task['TaskId']}"
-        
-        # Format the cron expression using UTC time
-        cron_expression = (
-            f"cron({notification_time.minute} {notification_time.hour} "
-            f"{notification_time.day} {notification_time.month} ? {notification_time.year})"
-        )
-        
-        events_client.put_rule(
-            Name=rule_name,
-            ScheduleExpression=cron_expression,
-            State='ENABLED'
-        )
+            logger.info(f"Successfully scheduled deadline notification for task {task['TaskId']} at {notification_time} UTC")
 
-        # Add target to the rule
-        events_client.put_targets(
-            Rule=rule_name,
-            Targets=[{
-                'Id': f"task-deadline-notification-{task['TaskId']}",
-                'Arn': context.invoked_function_arn.replace(
-                    context.function_name,
-                    'TaskDeadlineNotificationFunction'
-                ),
-                'Input': json.dumps({
-                    'taskId': task['TaskId'],
-                    'assignee_email': task['responsibility']
-                })
-            }]
-        )
-
-        logger.info(f"Scheduled deadline notification for task {task['TaskId']} at {notification_time} UTC")
-
+        except ValueError as ve:
+            logger.error(f"Invalid deadline format or missing environment variable: {ve}")
+            return
+            
     except Exception as e:
         logger.error(f"Error scheduling deadline notification: {e}")
-        
+        raise
+
 def send_task_notification(task, admin_email):
     if not TASKS_ASSIGNMENT_TOPIC_ARN:
         logger.error("Cannot send notification: SNS Topic ARN is not configured")

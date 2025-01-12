@@ -2,6 +2,28 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 
 Resources:
+  # SNS Topics should be defined first since they're referenced by multiple functions
+  TasksAssignmentNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: TasksAssignmentNotificationTopic
+
+  TasksDeadlineNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: TasksDeadlineNotificationTopic
+
+  ClosedTasksNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: ClosedTasksNotificationTopic
+
+  ReopenedTasksNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: ReopenedTasksNotificationTopic
+
+  # Cognito Resources
   CognitoUserPool:
     Type: AWS::Cognito::UserPool
     Properties:
@@ -36,6 +58,7 @@ Resources:
         - ALLOW_REFRESH_TOKEN_AUTH
         - ALLOW_ADMIN_USER_PASSWORD_AUTH
 
+  # DynamoDB Table
   TasksTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -48,6 +71,7 @@ Resources:
           KeyType: HASH
       BillingMode: PAY_PER_REQUEST
 
+  # API Gateway
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
@@ -59,7 +83,66 @@ Resources:
           CognitoAuth:
             UserPoolArn: !GetAtt CognitoUserPool.Arn
 
-  # ✅ New AddUserFunction to Create Cognito Users
+  # Lambda Functions
+  TaskDeadlineNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: deadline_notification.lambda_handler
+      Runtime: python3.11
+      CodeUri: functions/tasks/
+      Environment:
+        Variables:
+          TASKS_DEADLINE_TOPIC_ARN: !Ref TasksDeadlineNotificationTopic
+          TABLE_NAME: !Ref TasksTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TasksTable
+        - Statement:
+            Effect: Allow
+            Action:
+              - sns:Publish
+              - events:DeleteRule
+              - events:RemoveTargets
+            Resource: "*"
+
+  AssignTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: assign_task.lambda_handler
+      Runtime: python3.11
+      CodeUri: functions/tasks/
+      Environment:
+        Variables:
+          TASKS_ASSIGNMENT_TOPIC_ARN: !Ref TasksAssignmentNotificationTopic
+          TASKS_DEADLINE_TOPIC_ARN: !Ref TasksDeadlineNotificationTopic
+          TASKS_DEADLINE_FUNCTION_NAME: !Ref TaskDeadlineNotificationFunction
+          TASKS_DEADLINE_FUNCTION_ARN: !GetAtt TaskDeadlineNotificationFunction.Arn
+
+          TABLE_NAME: !Ref TasksTable
+          AWS_ACCOUNT_ID: !Ref AWS::AccountId
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+        - Statement:
+            Effect: Allow
+            Action:
+              - sns:Publish
+              - events:PutRule
+              - events:PutTargets
+              - lambda:AddPermission
+            Resource: 
+              - !GetAtt TasksAssignmentNotificationTopic.TopicArn
+              - !GetAtt TasksDeadlineNotificationTopic.TopicArn
+              - !GetAtt TaskDeadlineNotificationFunction.Arn
+              - "*"  # For EventBridge permissions
+      Events:
+        AssignTask:
+          Type: Api
+          Properties:
+            Path: /tasks
+            Method: post
+            RestApiId: !Ref ApiGateway
+
   AddUserFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -83,12 +166,11 @@ Resources:
               - sns:Subscribe
               - sns:Publish
             Resource: 
-              - !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPool}"
-              - !Ref TasksAssignmentNotificationTopic
-              - !Ref TasksDeadlineNotificationTopic
-              - !Ref ClosedTasksNotificationTopic
-              - !Ref ReopenedTasksNotificationTopic
-              
+              - !GetAtt CognitoUserPool.Arn
+              - !GetAtt TasksAssignmentNotificationTopic.TopicArn
+              - !GetAtt TasksDeadlineNotificationTopic.TopicArn
+              - !GetAtt ClosedTasksNotificationTopic.TopicArn
+              - !GetAtt ReopenedTasksNotificationTopic.TopicArn
       Events:
         AddUser:
           Type: Api
@@ -96,60 +178,7 @@ Resources:
             Path: /users
             Method: post
             RestApiId: !Ref ApiGateway
-            
-  AssignTaskFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: assign_task.lambda_handler
-      Runtime: python3.11
-      CodeUri: functions/tasks/
-      Environment:
-        Variables:
-          TASKS_ASSIGNMENT_TOPIC_ARN: !Ref TasksAssignmentNotificationTopic
-          TASKS_DEADLINE_TOPIC_ARN: !Ref TasksDeadlineNotificationTopic
-          TABLE_NAME: !Ref TasksTable
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref TasksTable
-        - Statement:
-            Effect: Allow
-            Action:
-              - sns:Publish
-              - events:PutRule
-              - events:PutTargets
-            Resource: 
-              - !Ref TasksAssignmentNotificationTopic
-              - !Ref TasksDeadlineNotificationTopic
-              - "*"  # For EventBridge permissions
-      Events:
-        AssignTask:
-          Type: Api
-          Properties:
-            Path: /tasks
-            Method: post
-            RestApiId: !Ref ApiGateway
 
-  TaskDeadlineNotificationFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: deadline_notification.lambda_handler
-      Runtime: python3.11
-      CodeUri: functions/tasks/
-      Environment:
-        Variables:
-          TASKS_DEADLINE_TOPIC_ARN: !Ref TasksDeadlineNotificationTopic
-          TABLE_NAME: !Ref TasksTable
-      Policies:
-        - DynamoDBReadPolicy:
-            TableName: !Ref TasksTable
-        - Statement:
-            Effect: Allow
-            Action:
-              - sns:Publish
-              - events:DeleteRule
-              - events:RemoveTargets
-            Resource: "*"
-            
   GetUserTasksFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -235,23 +264,3 @@ Resources:
             Method: get
             RestApiId: !Ref ApiGateway
 
-
-  TasksAssignmentNotificationTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: TasksAssignmentNotificationTopic
-
-  TasksDeadlineNotificationTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: TasksDeadlineNotificationTopic
-
-  ClosedTasksNotificationTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: ClosedTasksNotificationTopic
-
-  ReopenedTasksNotificationTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: ReopenedTasksNotificationTopic
