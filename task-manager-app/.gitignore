@@ -205,6 +205,8 @@ venv.bak/
 # mkdocs documentation
 /site
 
+.aws-sam/deps
+
 # mypy
 .mypy_cache/
 

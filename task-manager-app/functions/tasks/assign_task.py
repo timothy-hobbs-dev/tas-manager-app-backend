@@ -169,7 +169,13 @@ def lambda_handler(event, context):
         if 'deadline' in task:
             try:
                 due_date = datetime.fromisoformat(task['deadline'].replace('Z', '+00:00'))
-                if due_date <= datetime.utcnow():
+
+                # Ensure it's timezone-aware
+                if due_date.tzinfo is None:
+                    due_date = pytz.UTC.localize(due_date)
+
+                if due_date <= datetime.now(pytz.UTC):  # Compare with an aware datetime
+
                     return {
                         'statusCode': 400,
                         'body': json.dumps({'error': 'Deadline must be in the future'})
