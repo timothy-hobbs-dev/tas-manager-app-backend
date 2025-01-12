@@ -84,6 +84,7 @@ def schedule_deadline_notification(task, context):
 
     except Exception as e:
         logger.error(f"Error scheduling deadline notification: {e}")
+        
 def send_task_notification(task, admin_email):
     if not TASKS_ASSIGNMENT_TOPIC_ARN:
         logger.error("Cannot send notification: SNS Topic ARN is not configured")
@@ -111,13 +112,13 @@ Task Details:
 - Description: {message['description']}
 - Due Date: {message['deadline']}
 - Task ID: {message['taskId']}
-- Assigned by {message['assigned_by']}
+- Assigned by: {message['assigned_by']}
 
 Please log in to the system to view more details and start working on your task.
 """
         logger.info(f"Attempting to send notification to topic: {TASKS_ASSIGNMENT_TOPIC_ARN}")
         
-        # Publish to SNS topic
+        # Publish to SNS topic with message attributes for filtering
         response = sns_client.publish(
             TopicArn=TASKS_ASSIGNMENT_TOPIC_ARN,
             Message=email_message,
@@ -127,15 +128,16 @@ Please log in to the system to view more details and start working on your task.
                     'DataType': 'String',
                     'StringValue': assignee_email
                 }
-            }
+            },
+            MessageStructure='string'  # Explicitly set message structure
         )
         logger.info(f"Notification sent successfully: {response['MessageId']}")
+        
     except Exception as e:
         logger.error(f"Error sending notification: {e}")
         logger.error(f"Topic ARN: {TASKS_ASSIGNMENT_TOPIC_ARN}")
         logger.error(f"Task: {json.dumps(task)}")
-        pass
-
+        raise
 def lambda_handler(event, context):
     try:
         claims = event.get('requestContext', {}).get('authorizer', {}).get('claims', {})

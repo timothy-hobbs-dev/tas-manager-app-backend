@@ -237,9 +237,17 @@ Resources:
 
 
   TasksAssignmentNotificationTopic:
-      Type: AWS::SNS::Topic
-      Properties:
-        TopicName: TasksAssignmentNotificationTopic
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: TasksAssignmentNotificationTopic
+
+  EmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      TopicArn: !Ref TasksAssignmentNotificationTopic
+      FilterPolicy:
+        email: [{"anything-but": "default-email"}] 
 
   TasksDeadlineNotificationTopic:
     Type: AWS::SNS::Topic
