@@ -1,0 +1,57 @@
+{
+  "Comment": "State machine for handling expired tasks",
+  "StartAt": "UpdateTaskStatus",
+  "States": {
+    "UpdateTaskStatus": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Parameters": {
+        "TableName": "${DDBTableName}",
+        "Key": {
+          "TaskId": {
+            "S.$": "$.taskId"
+          }
+        },
+        "UpdateExpression": "SET #status = :status",
+        "ExpressionAttributeNames": {
+          "#status": "status"
+        },
+        "ExpressionAttributeValues": {
+          ":status": {
+            "S": "expired"
+          }
+        }
+      },
+      "Next": "GetTaskDetails"
+    },
+    "GetTaskDetails": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:getItem",
+      "Parameters": {
+        "TableName": "${DDBTableName}",
+        "Key": {
+          "TaskId": {
+            "S.$": "$.taskId"
+          }
+        }
+      },
+      "Next": "SendNotifications"
+    },
+    "SendNotifications": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${SNSTopicArn}",
+        "Message.$": "States.Format('Task {}: {} has expired.\nAssigned to: {}\nDeadline: {}', $.Item.TaskId.S, $.Item.name.S, $.Item.responsibility.S, $.Item.deadline.S)",
+        "Subject": "Task Expired Notification",
+        "MessageAttributes": {
+          "email": {
+            "DataType": "String",
+            "StringValue.$": "$.Item.responsibility.S"
+          }
+        }
+      },
+      "End": true
+    }
+  }
+}

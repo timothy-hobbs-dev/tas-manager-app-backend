@@ -84,27 +84,80 @@ Resources:
             UserPoolArn: !GetAtt CognitoUserPool.Arn
 
   # Lambda Functions
-  TaskDeadlineNotificationFunction:
+  DeadlineCheckFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: deadline_notification.lambda_handler
+      Handler: deadline_check.lambda_handler
       Runtime: python3.11
       CodeUri: functions/tasks/
       Environment:
         Variables:
-          TASKS_DEADLINE_TOPIC_ARN: !Ref TasksDeadlineNotificationTopic
           TABLE_NAME: !Ref TasksTable
+          EXPIRED_TASKS_QUEUE_URL: !Ref ExpiredTasksQueue
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref TasksTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt ExpiredTasksQueue.QueueName
         - Statement:
             Effect: Allow
             Action:
-              - sns:Publish
               - events:DeleteRule
               - events:RemoveTargets
             Resource: "*"
 
+
+    # Separate IAM role for TaskDeadlineNotificationFunction
+  TaskDeadlineNotificationFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: TaskDeadlineNotificationFunctionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource: !GetAtt TasksTable.Arn
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref TasksDeadlineNotificationTopic
+              - Effect: Allow
+                Action:
+                  - events:PutRule
+                  - events:PutTargets
+                  - events:DeleteRule
+                  - events:RemoveTargets
+                Resource: "*"
+
+  # Modified TaskDeadlineNotificationFunction
+  TaskDeadlineNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: deadline_warning.lambda_handler
+      Runtime: python3.11
+      CodeUri: functions/tasks/
+      Role: !GetAtt TaskDeadlineNotificationFunctionRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TasksTable
+          TASKS_DEADLINE_TOPIC_ARN: !Ref TasksDeadlineNotificationTopic
+          EXPIRED_TASKS_QUEUE_URL: !Ref ExpiredTasksQueue
+          DEADLINE_CHECK_FUNCTION_ARN: !GetAtt DeadlineCheckFunction.Arn
+          
   AssignTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -288,3 +341,49 @@ Resources:
             Method: get
             RestApiId: !Ref ApiGateway
 
+   # Add SQS Queue for expired tasks
+  ExpiredTasksQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: ExpiredTasksQueue
+      VisibilityTimeout: 300  # 5 minutes
+
+  # Step Function for handling expired tasks
+  ExpiredTasksStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachine/expired_tasks.asl.json
+      DefinitionSubstitutions:
+        DDBTableName: !Ref TasksTable
+        SNSTopicArn: !Ref ClosedTasksNotificationTopic
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt ClosedTasksNotificationTopic.TopicName
+        - SQSPollerPolicy:
+            QueueName: !GetAtt ExpiredTasksQueue.QueueName
+
+  # Lambda function to process expired tasks
+  ProcessExpiredTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: process_expired_task.lambda_handler
+      Runtime: python3.11
+      CodeUri: functions/tasks/
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TasksTable
+          CLOSED_TASKS_TOPIC_ARN: !Ref ClosedTasksNotificationTopic
+          STEP_FUNCTION_ARN: !Ref ExpiredTasksStateMachine
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+        - StepFunctionsExecutionPolicy:
+            StateMachineName: !GetAtt ExpiredTasksStateMachine.Name
+      Events:
+        ExpiredTasksQueue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ExpiredTasksQueue.Arn
+            BatchSize: 1

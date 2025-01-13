@@ -46,7 +46,7 @@ def schedule_deadline_notification(task, context):
                 return
             
             # Calculate notification time (1 hour before deadline)
-            notification_time = due_date - timedelta(hours=1)
+            notification_time = due_date - timedelta(minutes=2)
             
             # Create a CloudWatch Events rule
             rule_name = f"task-deadline-{task['TaskId']}"
