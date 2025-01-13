@@ -247,6 +247,30 @@ Resources:
             Method: get
             RestApiId: !Ref ApiGateway
 
+  GetAllUsersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: get_all_users.lambda_handler
+      Runtime: python3.11
+      CodeUri: functions/users/
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:ListUsers
+              Resource: !GetAtt CognitoUserPool.Arn
+      Events:
+        GetAllUsers:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: get
+            RestApiId: !Ref ApiGateway
+            
   TestApiFunction:
     Type: AWS::Serverless::Function
     Properties:
