@@ -98,6 +98,20 @@ Please ensure you complete this task before the deadline.
             }]
         )
 
+    # Add permission for EventBridge to invoke the Lambda
+        lambda_client = boto3.client('lambda')
+        try:
+            lambda_client.add_permission(
+                FunctionName=os.environ['DEADLINE_CHECK_FUNCTION_NAME'],
+                StatementId=f"EventBridge-{task['TaskId']}",
+                Action='lambda:InvokeFunction',
+                Principal='events.amazonaws.com',
+                SourceArn=f"arn:aws:events:{os.environ['AWS_REGION']}:{os.environ['AWS_ACCOUNT_ID']}:rule/{deadline_rule_name}"
+            )
+        except lambda_client.exceptions.ResourceConflictException:
+            # Permission already exists, which is fine
+            pass
+
         # Clean up the warning notification rule
         warning_rule_name = f"task-deadline-{task_id}"
         events_client.remove_targets(

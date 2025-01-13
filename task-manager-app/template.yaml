@@ -142,6 +142,11 @@ Resources:
                   - events:DeleteRule
                   - events:RemoveTargets
                 Resource: "*"
+              # Add new permission for Lambda:AddPermission
+              - Effect: Allow
+                Action:
+                  - lambda:AddPermission
+                Resource: !GetAtt DeadlineCheckFunction.Arn
 
   # Modified TaskDeadlineNotificationFunction
   TaskDeadlineNotificationFunction:
@@ -157,6 +162,9 @@ Resources:
           TASKS_DEADLINE_TOPIC_ARN: !Ref TasksDeadlineNotificationTopic
           EXPIRED_TASKS_QUEUE_URL: !Ref ExpiredTasksQueue
           DEADLINE_CHECK_FUNCTION_ARN: !GetAtt DeadlineCheckFunction.Arn
+          DEADLINE_CHECK_FUNCTION_NAME: !Ref DeadlineCheckFunction
+          AWS_ACCOUNT_ID: !Ref AWS::AccountId
+
           
   AssignTaskFunction:
     Type: AWS::Serverless::Function
