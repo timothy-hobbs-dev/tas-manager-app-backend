@@ -17,45 +17,47 @@ TASKS_ASSIGNMENT_TOPIC_ARN = os.getenv('TASKS_ASSIGNMENT_TOPIC_ARN')
 TASKS_DEADLINE_TOPIC_ARN = os.getenv('TASKS_DEADLINE_TOPIC_ARN')
 CLOSED_TASKS_TOPIC_ARN = os.getenv('CLOSED_TASKS_TOPIC_ARN')
 REOPENED_TASKS_TOPIC_ARN = os.getenv('REOPENED_TASKS_TOPIC_ARN')
+TASKS_COMPLETED_TOPIC_ARN = os.getenv('TASKS_COMPLETED_TOPIC_ARN')
 
-def subscribe_to_topic_with_filter(email, topic_arn, topic_name):
+def subscribe_to_topic(email, topic_arn, topic_name, apply_filter):
     """
-    Subscribe a user to an SNS topic with email-specific filtering
+    Subscribe a user to an SNS topic with optional email-specific filtering
     """
     try:
-        # Create subscription with filter policy
+        attributes = {}
+        if apply_filter:
+            attributes['FilterPolicy'] = json.dumps({'email': [email]})
+        
+        # Create subscription
         response = sns_client.subscribe(
             TopicArn=topic_arn,
             Protocol='email',
             Endpoint=email,
-            Attributes={
-                'FilterPolicy': json.dumps({
-                    'email': [email]
-                })
-            }
+            Attributes=attributes
         )
-        logger.info(f"Successfully subscribed {email} to {topic_name} with filter policy")
+        logger.info(f"Successfully subscribed {email} to {topic_name} {'with filter policy' if apply_filter else ''}")
         return response['SubscriptionArn']
     except Exception as e:
         logger.error(f"Error subscribing {email} to {topic_name}: {str(e)}")
         raise
 
-def subscribe_to_all_topics(email):
+def subscribe_to_all_topics(email, role):
     """
     Subscribe user to all notification topics with appropriate filters
     """
     topic_configs = [
-        (TASKS_ASSIGNMENT_TOPIC_ARN, "Task Assignments"),
-        (TASKS_DEADLINE_TOPIC_ARN, "Task Deadlines"),
-        (CLOSED_TASKS_TOPIC_ARN, "Closed Tasks"),
-        (REOPENED_TASKS_TOPIC_ARN, "Reopened Tasks")
+        (TASKS_ASSIGNMENT_TOPIC_ARN, "Task Assignments", True),
+        (TASKS_DEADLINE_TOPIC_ARN, "Task Deadlines", role != 'admin'),
+        (CLOSED_TASKS_TOPIC_ARN, "Closed Tasks", role != 'admin'),
+        (REOPENED_TASKS_TOPIC_ARN, "Reopened Tasks", True),
+        (TASKS_COMPLETED_TOPIC_ARN, "Task Completed", role != 'admin')
     ]
     
     subscription_results = []
-    for topic_arn, topic_name in topic_configs:
+    for topic_arn, topic_name, apply_filter in topic_configs:
         if topic_arn:  # Only attempt subscription if topic ARN is configured
             try:
-                subscription_arn = subscribe_to_topic_with_filter(email, topic_arn, topic_name)
+                subscription_arn = subscribe_to_topic(email, topic_arn, topic_name, apply_filter)
                 subscription_results.append({
                     'topic': topic_name,
                     'status': 'success',
@@ -124,7 +126,7 @@ def lambda_handler(event, context):
         cognito_response = create_cognito_user(username, email, role, temporary_password)
         
         # Subscribe to notification topics
-        subscription_results = subscribe_to_all_topics(email)
+        subscription_results = subscribe_to_all_topics(email, role)
         
         # Prepare success response
         return {

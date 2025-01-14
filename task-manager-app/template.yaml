@@ -23,6 +23,11 @@ Resources:
     Properties:
       TopicName: ReopenedTasksNotificationTopic
 
+  TasksCompleteNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: TasksCompleteNotificationTopic
+
   # Cognito Resources
   CognitoUserPool:
     Type: AWS::Cognito::UserPool
@@ -223,6 +228,7 @@ Resources:
           TASKS_DEADLINE_TOPIC_ARN: !Ref TasksDeadlineNotificationTopic
           CLOSED_TASKS_TOPIC_ARN: !Ref ClosedTasksNotificationTopic
           REOPENED_TASKS_TOPIC_ARN: !Ref ReopenedTasksNotificationTopic
+          TASKS_COMPLETED_TOPIC_ARN: !Ref TasksCompleteNotificationTopic
       Policies:
         - AWSLambdaBasicExecutionRole
         - Statement:
