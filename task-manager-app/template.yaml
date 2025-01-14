@@ -94,17 +94,23 @@ Resources:
         Variables:
           TABLE_NAME: !Ref TasksTable
           EXPIRED_TASKS_QUEUE_URL: !Ref ExpiredTasksQueue
+          CLOSED_TASKS_TOPIC_ARN: !Ref ClosedTasksNotificationTopic
       Policies:
-        - DynamoDBReadPolicy:
-            TableName: !Ref TasksTable
-        - SQSSendMessagePolicy:
-            QueueName: !GetAtt ExpiredTasksQueue.QueueName
-        - Statement:
-            Effect: Allow
-            Action:
-              - events:DeleteRule
-              - events:RemoveTargets
-            Resource: "*"
+      - DynamoDBReadPolicy:
+          TableName: !Ref TasksTable
+      - SQSSendMessagePolicy:
+          QueueName: !GetAtt ExpiredTasksQueue.QueueName
+      - Statement:
+          Effect: Allow
+          Action:
+            - sns:Publish
+          Resource: !Ref ClosedTasksNotificationTopic
+      - Statement:
+          Effect: Allow
+          Action:
+            - events:DeleteRule
+            - events:RemoveTargets
+          Resource: "*"
 
 
     # Separate IAM role for TaskDeadlineNotificationFunction

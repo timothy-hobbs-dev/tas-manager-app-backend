@@ -12,10 +12,12 @@ logger.setLevel(logging.INFO)
 # Initialize AWS clients
 dynamodb = boto3.resource('dynamodb')
 sqs = boto3.client('sqs')
+sns_client = boto3.client('sns')
 events_client = boto3.client('events')
 
 TABLE_NAME = os.environ.get('TABLE_NAME')
 EXPIRED_TASKS_QUEUE_URL = os.environ.get('EXPIRED_TASKS_QUEUE_URL')
+CLOSED_TASKS_TOPIC_ARN = os.environ.get('CLOSED_TASKS_TOPIC_ARN')
 
 def lambda_handler(event, context):
     try:
@@ -46,6 +48,33 @@ def lambda_handler(event, context):
             })
         )
 
+        # Send SNS notification to ClosedTasksNotificationTopic
+        message = f"""
+🚨 Task Deadline Reached 🚨
+
+The following task has reached its deadline and has been moved to processing:
+
+Task Details:
+- Title: {task.get('name', 'No title')}
+- Description: {task.get('description', 'No description')}
+- Due Date: {task.get('deadline', 'No deadline')}
+- Task ID: {task_id}
+
+Please follow up as necessary.
+"""
+
+        sns_client.publish(
+            TopicArn=CLOSED_TASKS_TOPIC_ARN,
+            Message=message,
+            Subject='🚨 Task Deadline Reached 🚨',
+            MessageAttributes={
+                'email': {
+                    'DataType': 'String',
+                    'StringValue': assignee_email
+                }
+            }
+        )
+
         # Clean up the deadline rule
         rule_name = f"task-final-deadline-{task_id}"
         events_client.remove_targets(
@@ -56,7 +85,7 @@ def lambda_handler(event, context):
             Name=rule_name
         )
 
-        logger.info(f"Task {task_id} deadline reached, sent to processing queue")
+        logger.info(f"Task {task_id} deadline reached, sent to processing queue and notified via SNS.")
 
     except Exception as e:
         logger.error(f"Error in deadline check handler: {e}")
