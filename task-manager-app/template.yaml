@@ -275,9 +275,39 @@ Resources:
       Handler: edit_task.lambda_handler
       Runtime: python3.11
       CodeUri: functions/tasks/
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TasksTable
+          TASKS_ASSIGNMENT_TOPIC_ARN: !Ref TasksAssignmentNotificationTopic
+          REOPENED_TASKS_TOPIC_ARN: !Ref ReopenedTasksNotificationTopic
+          TASKS_COMPLETE_TOPIC_ARN: !Ref TasksCompleteNotificationTopic
+          TASKS_DEADLINE_FUNCTION_NAME: !Ref TaskDeadlineNotificationFunction
+          TASKS_DEADLINE_FUNCTION_ARN: !GetAtt TaskDeadlineNotificationFunction.Arn
+          AWS_ACCOUNT_ID: !Ref AWS::AccountId
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TasksTable
+        - Statement:
+            Effect: Allow
+            Action:
+              - sns:Publish
+            Resource:
+              - !Ref TasksAssignmentNotificationTopic
+              - !Ref ReopenedTasksNotificationTopic
+              - !Ref TasksCompleteNotificationTopic
+        - Statement:
+            Effect: Allow
+            Action:
+              - events:PutRule
+              - events:PutTargets
+              - events:DeleteRule
+              - events:RemoveTargets
+            Resource: "*"
+        - Statement:
+            Effect: Allow
+            Action:
+              - lambda:AddPermission
+            Resource: "*"
       Events:
         EditTask:
           Type: Api
