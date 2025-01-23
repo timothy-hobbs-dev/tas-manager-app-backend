@@ -280,7 +280,13 @@ def lambda_handler(event, context):
         
         if not user_email:
             logger.warning("Unauthorized access attempt: Missing email claim")
-            return {'statusCode': 401, 'body': json.dumps({'error': 'Unauthorized'})}
+            return {
+                'statusCode': 401,
+                    'headers': {
+                        'Content-Type': 'application/json'
+                    },
+                    'body': json.dumps({'error': 'Unauthorized'})
+                }
         
         # Parse request body
         task_update = json.loads(event.get('body', '{}'))
@@ -320,6 +326,9 @@ def lambda_handler(event, context):
             except ValueError:
                 return {
                     'statusCode': 400,
+                    'headers': {
+                        'Content-Type': 'application/json'
+                    },
                     'body': json.dumps({'error': 'Invalid deadline format. Use ISO format (e.g., 2025-01-11T18:00:00Z)'})
                 }
             
@@ -371,8 +380,19 @@ def lambda_handler(event, context):
     
     except json.JSONDecodeError:
         logger.error("Error decoding JSON request body")
-        return {'statusCode': 400, 'body': json.dumps({'error': 'Invalid JSON format'})}
+        return {
+            'statusCode': 400,
+                'headers': {
+                    'Content-Type': 'application/json'
+                },
+            'body': json.dumps({'error': 'Invalid JSON format'})
+            }
     
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        return {'statusCode': 500, 'body': json.dumps({'error': 'Internal Server Error'})}
+        return {
+            'statusCode': 500,
+                'headers': {
+                    'Content-Type': 'application/json'
+                }, 'body': json.dumps({'error': 'Internal Server Error'})
+        }

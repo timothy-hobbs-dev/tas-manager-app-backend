@@ -131,6 +131,9 @@ def lambda_handler(event, context):
         # Prepare success response
         return {
             'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json'
+            },
             'body': json.dumps({
                 'message': 'User created successfully',
                 'username': username,
@@ -143,6 +146,9 @@ def lambda_handler(event, context):
         logger.error(f"Error in lambda_handler: {str(e)}")
         return {
             'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json'
+            },
             'body': json.dumps({
                 'error': 'Internal server error',
                 'details': str(e)

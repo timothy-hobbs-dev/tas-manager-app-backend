@@ -11,5 +11,8 @@ def lambda_handler(event, context):
     response = table.scan(FilterExpression=boto3.dynamodb.conditions.Attr('responsibility').eq(user_email))
     return {
         'statusCode': 200,
+        'headers': {
+                'Content-Type': 'application/json'
+            },
         'body': json.dumps(response['Items'])
     }

@@ -10,4 +10,8 @@ def lambda_handler(event, context):
         return {'statusCode': 403, 'body': 'Unauthorized'}
 
     response = table.scan()
-    return {'statusCode': 200, 'body': json.dumps(response['Items'])}
+    return {'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json'
+            },
+            'body': json.dumps(response['Items'])}

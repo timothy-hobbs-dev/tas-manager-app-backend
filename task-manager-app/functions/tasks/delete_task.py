@@ -42,12 +42,23 @@ def lambda_handler(event, context):
         table.delete_item(Key={'TaskId': task_id})
         logger.info(f"Task deleted successfully: {task_id}")
 
-        return {'statusCode': 200, 'body': json.dumps({'message': 'Task deleted successfully'})}
+        return {'statusCode': 200,
+                'headers': {
+                'Content-Type': 'application/json'
+            },
+            'body': json.dumps({'message': 'Task deleted successfully'})}
 
     except json.JSONDecodeError as e:
         logger.error(f"JSON decode error: {e}")
-        return {'statusCode': 400, 'body': json.dumps({'error': 'Invalid JSON format'})}
+        return {'statusCode': 400,
+                'headers': {
+                'Content-Type': 'application/json'
+            },
+            'body': json.dumps({'error': 'Invalid JSON format'})}
 
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        return {'statusCode': 500, 'body': json.dumps({'error': 'Internal Server Error'})}
+        return {'statusCode': 500,'headers': {
+                'Content-Type': 'application/json'
+            },
+        'body': json.dumps({'error': 'Internal Server Error'})}
