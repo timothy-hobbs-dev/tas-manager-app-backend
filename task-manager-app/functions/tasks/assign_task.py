@@ -187,6 +187,9 @@ def lambda_handler(event, context):
             logger.warning("Invalid request: Missing task data")
             return {
                 'statusCode': 400,
+                'headers': {
+                    'Content-Type': 'application/json'
+                },
                 'body': json.dumps({'error': 'Invalid request: Missing task data'})
             }
         
@@ -196,6 +199,9 @@ def lambda_handler(event, context):
         if missing_fields:
             return {
                 'statusCode': 400,
+                'headers': {
+                    'Content-Type': 'application/json'
+                },
                 'body': json.dumps({'error': f'Missing required fields: {", ".join(missing_fields)}'})
             }
 
@@ -217,6 +223,9 @@ def lambda_handler(event, context):
             except ValueError:
                 return {
                     'statusCode': 400,
+                    'headers': {
+                        'Content-Type': 'application/json'
+                    },
                     'body': json.dumps({'error': 'Invalid deadline format. Use ISO format (e.g., 2025-01-11T18:00:00Z)'})
                 }
 
@@ -238,6 +247,9 @@ def lambda_handler(event, context):
         
         return {
             'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json'
+            },
             'body': json.dumps({
                 'message': 'Task assigned successfully!',
                 'TaskId': task['TaskId']
@@ -248,6 +260,9 @@ def lambda_handler(event, context):
         logger.error("Error decoding JSON request body")
         return {
             'statusCode': 400,
+            'headers': {
+                'Content-Type': 'application/json'
+            },
             'body': json.dumps({'error': 'Invalid JSON format'})
         }
     
@@ -255,5 +270,8 @@ def lambda_handler(event, context):
         logger.error(f"Unexpected error: {e}")
         return {
             'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json'
+            },
             'body': json.dumps({'error': 'Internal Server Error'})
         }

@@ -49,8 +49,17 @@ Resources:
         - Name: role
           AttributeDataType: String
           Mutable: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
+        InviteMessageTemplate:
+          EmailMessage: "Welcome to your TaskOverflow, {username}. Here is your temporary password: {####}.\n\nLog in @ https://d209hzsjvt0i7d.cloudfront.net/"
+          EmailSubject: "Get Started on TaskOverflow"
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
 
   CognitoUserPoolClient:
     Type: AWS::Cognito::UserPoolClient
@@ -93,7 +102,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: deadline_check.lambda_handler
-      Runtime: python3.11
+      Runtime: python3.10
       CodeUri: functions/tasks/
       Environment:
         Variables:
@@ -164,7 +173,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: deadline_warning.lambda_handler
-      Runtime: python3.11
+      Runtime: python3.10
       CodeUri: functions/tasks/
       Role: !GetAtt TaskDeadlineNotificationFunctionRole.Arn
       Environment:
@@ -181,7 +190,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: assign_task.lambda_handler
-      Runtime: python3.11
+      Runtime: python3.10
       CodeUri: functions/tasks/
       Environment:
         Variables:
@@ -219,7 +228,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: add_user.lambda_handler
-      Runtime: python3.11
+      Runtime: python3.10
       CodeUri: functions/users/
       Environment:
         Variables:
@@ -256,7 +265,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: get_user_tasks.lambda_handler
-      Runtime: python3.11
+      Runtime: python3.10
       CodeUri: functions/tasks/
       Policies:
         - DynamoDBReadPolicy:
@@ -273,7 +282,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: edit_task.lambda_handler
-      Runtime: python3.11
+      Runtime: python3.10
       CodeUri: functions/tasks/
       Environment:
         Variables:
@@ -320,7 +329,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: delete_task.lambda_handler
-      Runtime: python3.11
+      Runtime: python3.10
       CodeUri: functions/tasks/
       Policies:
         - DynamoDBCrudPolicy:
@@ -337,7 +346,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: get_all_tasks.lambda_handler
-      Runtime: python3.11
+      Runtime: python3.10
       CodeUri: functions/tasks/
       Policies:
         - DynamoDBReadPolicy:
@@ -354,7 +363,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: get_all_users.lambda_handler
-      Runtime: python3.11
+      Runtime: python3.10
       CodeUri: functions/users/
       Environment:
         Variables:
@@ -378,7 +387,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: testapi.lambda_handler
-      Runtime: python3.11
+      Runtime: python3.10
       CodeUri: functions/tasks/
       Policies:
         - DynamoDBReadPolicy:
@@ -419,7 +428,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: process_expired_task.lambda_handler
-      Runtime: python3.11
+      Runtime: python3.10
       CodeUri: functions/tasks/
       Environment:
         Variables:

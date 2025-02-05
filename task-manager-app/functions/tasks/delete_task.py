@@ -22,7 +22,10 @@ def lambda_handler(event, context):
         
         if not is_admin:
             logger.warning("Unauthorized delete attempt")
-            return {'statusCode': 403, 'body': json.dumps({'error': 'Unauthorized'})}
+            return {'statusCode': 403,
+            'headers':{
+                'Content-Type': 'application/json'
+            }, 'body': json.dumps({'error': 'Unauthorized'})}
 
         # Parse the request body safely
         body = json.loads(event['body'])  # Fix: Parse the JSON string into a dictionary
@@ -31,7 +34,11 @@ def lambda_handler(event, context):
 
         if not task_id:
             logger.warning("Invalid request: Missing TaskId")
-            return {'statusCode': 400, 'body': json.dumps({'error': 'Invalid request: Missing TaskId'})}
+            return {'statusCode': 400, 
+            'headers': {
+                'Content-Type': 'application/json'
+            },
+            'body': json.dumps({'error': 'Invalid request: Missing TaskId'})}
 
         response = table.get_item(Key={'TaskId': task_id})
 

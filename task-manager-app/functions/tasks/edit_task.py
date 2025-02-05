@@ -376,7 +376,10 @@ def lambda_handler(event, context):
         table.put_item(Item=task)
         logger.info(f"Task updated successfully: {task_id}")
         
-        return {'statusCode': 200, 'body': json.dumps({'message': 'Task updated successfully'})}
+        return {'statusCode': 200,
+        'headers':{
+            'Content-Type': 'application/json'
+        } 'body': json.dumps({'message': 'Task updated successfully'})}
     
     except json.JSONDecodeError:
         logger.error("Error decoding JSON request body")
