@@ -23,8 +23,10 @@ def lambda_handler(event, context):
         if not is_admin:
             logger.warning("Unauthorized delete attempt")
             return {'statusCode': 403,
-            'headers':{
-                'Content-Type': 'application/json'
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": True
             }, 'body': json.dumps({'error': 'Unauthorized'})}
 
         # Parse the request body safely
@@ -35,8 +37,10 @@ def lambda_handler(event, context):
         if not task_id:
             logger.warning("Invalid request: Missing TaskId")
             return {'statusCode': 400, 
-            'headers': {
-                'Content-Type': 'application/json'
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": True
             },
             'body': json.dumps({'error': 'Invalid request: Missing TaskId'})}
 
@@ -50,22 +54,28 @@ def lambda_handler(event, context):
         logger.info(f"Task deleted successfully: {task_id}")
 
         return {'statusCode': 200,
-                'headers': {
-                'Content-Type': 'application/json'
+                "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": True
             },
             'body': json.dumps({'message': 'Task deleted successfully'})}
 
     except json.JSONDecodeError as e:
         logger.error(f"JSON decode error: {e}")
         return {'statusCode': 400,
-                'headers': {
-                'Content-Type': 'application/json'
+                "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": True
             },
             'body': json.dumps({'error': 'Invalid JSON format'})}
 
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        return {'statusCode': 500,'headers': {
-                'Content-Type': 'application/json'
+        return {'statusCode': 500,"headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": True
             },
         'body': json.dumps({'error': 'Internal Server Error'})}

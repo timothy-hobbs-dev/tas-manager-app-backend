@@ -117,6 +117,11 @@ def lambda_handler(event, context):
         if not username or not email:
             return {
                 'statusCode': 400,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": True
+                },
                 'body': json.dumps({
                     'error': 'Missing required fields: username and email are required'
                 })
@@ -131,8 +136,10 @@ def lambda_handler(event, context):
         # Prepare success response
         return {
             'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json'
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": True
             },
             'body': json.dumps({
                 'message': 'User created successfully',
@@ -146,8 +153,10 @@ def lambda_handler(event, context):
         logger.error(f"Error in lambda_handler: {str(e)}")
         return {
             'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json'
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": True
             },
             'body': json.dumps({
                 'error': 'Internal server error',

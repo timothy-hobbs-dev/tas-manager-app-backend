@@ -282,8 +282,10 @@ def lambda_handler(event, context):
             logger.warning("Unauthorized access attempt: Missing email claim")
             return {
                 'statusCode': 401,
-                    'headers': {
-                        'Content-Type': 'application/json'
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": True
                     },
                     'body': json.dumps({'error': 'Unauthorized'})
                 }
@@ -326,8 +328,10 @@ def lambda_handler(event, context):
             except ValueError:
                 return {
                     'statusCode': 400,
-                    'headers': {
-                        'Content-Type': 'application/json'
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": True
                     },
                     'body': json.dumps({'error': 'Invalid deadline format. Use ISO format (e.g., 2025-01-11T18:00:00Z)'})
                 }
@@ -377,17 +381,21 @@ def lambda_handler(event, context):
         logger.info(f"Task updated successfully: {task_id}")
         
         return {'statusCode': 200,
-        'headers':{
-            'Content-Type': 'application/json'
-        } 'body': json.dumps({'message': 'Task updated successfully'})}
+       "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": True
+            }, 'body': json.dumps({'message': 'Task updated successfully'})}
     
     except json.JSONDecodeError:
         logger.error("Error decoding JSON request body")
         return {
             'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json'
-                },
+                "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": True
+            },
             'body': json.dumps({'error': 'Invalid JSON format'})
             }
     
@@ -395,7 +403,9 @@ def lambda_handler(event, context):
         logger.error(f"Unexpected error: {e}")
         return {
             'statusCode': 500,
-                'headers': {
-                    'Content-Type': 'application/json'
-                }, 'body': json.dumps({'error': 'Internal Server Error'})
+                "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": True
+            }, 'body': json.dumps({'error': 'Internal Server Error'})
         }
