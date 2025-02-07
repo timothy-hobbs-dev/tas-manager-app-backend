@@ -296,7 +296,13 @@ def lambda_handler(event, context):
         
         if not task_id:
             logger.warning("Invalid request: Missing TaskId")
-            return {'statusCode': 400, 'body': json.dumps({'error': 'Invalid request: Missing TaskId'})}
+            return {'statusCode': 400,
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": True
+                    },
+                    'body': json.dumps({'error': 'Invalid request: Missing TaskId'})}
         
         # Get existing task
         response = table.get_item(Key={'TaskId': task_id})
@@ -304,12 +310,24 @@ def lambda_handler(event, context):
         
         if not task:
             logger.warning(f"Task not found: {task_id}")
-            return {'statusCode': 404, 'body': json.dumps({'error': 'Task not found'})}
+            return {'statusCode': 404,
+            "headers": {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": True
+                    },
+            'body': json.dumps({'error': 'Task not found'})}
         
         # Check permissions
         if not is_admin and task['responsibility'] != user_email:
             logger.warning(f"Unauthorized update attempt by {user_email} on task {task_id}")
-            return {'statusCode': 403, 'body': json.dumps({'error': 'Unauthorized'})}
+            return {'statusCode': 403,
+            "headers": {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": True
+                    },
+            'body': json.dumps({'error': 'Unauthorized'})}
         
         # Handle deadline updates (admin only)
         if is_admin and 'deadline' in task_update:
@@ -323,6 +341,11 @@ def lambda_handler(event, context):
                 if due_date <= datetime.now(pytz.UTC) + timedelta(minutes=2):
                     return {
                         'statusCode': 400,
+                        "headers": {
+                            "Content-Type": "application/json",
+                            "Access-Control-Allow-Origin": "*",
+                            "Access-Control-Allow-Credentials": True
+                        },
                         'body': json.dumps({'error': 'Deadline must be in the future'})
                     }
             except ValueError:
